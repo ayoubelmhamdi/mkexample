@@ -1,0 +1,330 @@
+{
+    "c": {
+        "extension": "c",
+        "buildtool": "cmake",
+        "templates": {
+            "helloworld": {
+                "base": "int main() {\n    printf(\"Hello, World!\\n\");\n    return 0;\n}"
+            },
+            "fun": {
+                "base": "void greet() {\n    printf(\"Hello!\\n\");\n}"
+            }
+        },
+        "options": {
+            "class": {
+                "available": false
+            },
+            "interface": {
+                "available": false
+            },
+            "types": {
+                "available": true,
+                "required": false,
+                "description": "C always has types, this option adds more explicit typing"
+            },
+            "comment": {
+                "available": true,
+                "required": false,
+                "levels": {
+                    "0": "",
+                    "1": "// {description}",
+                    "max": "/*\n * {description}\n * @author Generated\n */"
+                }
+            },
+            "doc": {
+                "available": true,
+                "required": false,
+                "levels": {
+                    "0": "",
+                    "1": "// Doc: {description}",
+                    "max": "/**\n * @file {filename}\n * @brief {description}\n */"
+                }
+            },
+            "include": {
+                "available": true,
+                "required": false,
+                "levels": {
+                    "0": "",
+                    "1": "#include <stdio.h>",
+                    "max": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>"
+                }
+            }
+        }
+    },
+    "python": {
+        "extension": "py",
+        "buildtool": "pip",
+        "templates": {
+            "helloworld": {
+                "base": "print(\"Hello, World!\")"
+            },
+            "fun": {
+                "levels": {
+                    "0": "def greet(name):\n    print(f\"Hello, {name}!\")",
+                    "types": "def greet(name: str) -> None:\n    print(f\"Hello, {name}!\")",
+                    "max": "def greet(name: str) -> None:\n    \"\"\"Greet a person by name.\n    \n    Args:\n        name: The name of the person to greet.\n    \"\"\"\n    print(f\"Hello, {name}!\")"
+                }
+            }
+        },
+        "options": {
+            "class": {
+                "available": true,
+                "required": false,
+                "levels": {
+                    "0": "class {classname}:\n    def greet(self):\n        print(\"Hello, World!\")",
+                    "types": "class {classname}:\n    def greet(self) -> None:\n        print(\"Hello, World!\")",
+                    "1": "class {classname}:\n    def __init__(self):\n        self.message = \"Hello, World!\"\n    \n    def greet(self):\n        print(self.message)",
+                    "2": "class {classname}:\n    def __init__(self, message: str = \"Hello, World!\") -> None:\n        self._message = message\n    \n    @property\n    def message(self) -> str:\n        return self._message\n    \n    def greet(self) -> None:\n        print(self.message)",
+                    "max": "from abc import ABC, abstractmethod\n\nclass Abstract{classname}(ABC):\n    @abstractmethod\n    def greet(self) -> None:\n        pass\n\nclass {classname}(Abstract{classname}):\n    def __init__(self, message: str = \"Hello, World!\") -> None:\n        self._message = message\n    \n    @property\n    def message(self) -> str:\n        return self._message\n    \n    @message.setter\n    def message(self, value: str) -> None:\n        self._message = value\n    \n    def greet(self) -> None:\n        print(self.message)\n\nif __name__ == \"__main__\":\n    hw = {classname}()\n    hw.greet()"
+                }
+            },
+            "interface": {
+                "available": true,
+                "required": false,
+                "levels": {
+                    "0": "class {interfacename}:\n    def greet(self):\n        raise NotImplementedError",
+                    "types": "from abc import ABC, abstractmethod\n\nclass {interfacename}(ABC):\n    @abstractmethod\n    def greet(self) -> None:\n        pass",
+                    "max": "from abc import ABC, abstractmethod\nfrom typing import Protocol\n\nclass {interfacename}Protocol(Protocol):\n    def greet(self) -> None: ...\n\nclass {interfacename}(ABC):\n    @abstractmethod\n    def greet(self) -> None:\n        pass\n    \n    @abstractmethod\n    def get_message(self) -> str:\n        pass"
+                }
+            },
+            "types": {
+                "available": true,
+                "required": false,
+                "description": "Add type annotations to function signatures"
+            },
+            "comment": {
+                "available": true,
+                "required": false,
+                "levels": {
+                    "0": "",
+                    "1": "# {description}",
+                    "max": "# ============================================\n# {description}\n# ============================================"
+                }
+            },
+            "doc": {
+                "available": true,
+                "required": false,
+                "levels": {
+                    "0": "",
+                    "1": "\"\"\"{description}\"\"\"",
+                    "max": "\"\"\"{description}\n\nThis module provides a comprehensive demonstration of\nPython programming basics.\n\nAuthor: Generated by mkexample\nVersion: 1.0.0\n\"\"\""
+                }
+            },
+            "fun": {
+                "available": true,
+                "required": false,
+                "levels": {
+                    "0": "def {funname}({args}):\n    pass",
+                    "types": "def {funname}({typed_args}) -> {return_type}:\n    pass",
+                    "max": "def {funname}({typed_args}) -> {return_type}:\n    \"\"\"{description}\n    \n    Args:\n        {arg_docs}\n    \n    Returns:\n        {return_doc}\n    \"\"\"\n    pass"
+                }
+            }
+        }
+    },
+    "rust": {
+        "extension": "rs",
+        "buildtool": "cargo",
+        "templates": {
+            "helloworld": {
+                "base": "fn main() {\n    println!(\"Hello, World!\");\n}"
+            },
+            "fun": {
+                "levels": {
+                    "0": "fn greet(name: &str) {\n    println!(\"Hello, {}!\", name);\n}",
+                    "max": "/// Greet a person by name.\n///\n/// # Arguments\n/// * `name` - The name of the person.\nfn greet(name: &str) {\n    println!(\"Hello, {}!\", name);\n}"
+                }
+            }
+        },
+        "options": {
+            "class": {
+                "available": true,
+                "required": false,
+                "levels": {
+                    "0": "struct {classname};",
+                    "1": "struct {classname} {\n    message: String,\n}\n\nimpl {classname} {\n    fn new() -> Self {\n        Self {\n            message: String::from(\"Hello, World!\"),\n        }\n    }\n    \n    fn greet(&self) {\n        println!(\"{}\", self.message);\n    }\n}",
+                    "max": "pub struct {classname} {\n    message: String,\n}\n\nimpl Default for {classname} {\n    fn default() -> Self {\n        Self::new()\n    }\n}\n\nimpl {classname} {\n    pub fn new() -> Self {\n        Self {\n            message: String::from(\"Hello, World!\"),\n        }\n    }\n    \n    pub fn with_message(message: impl Into<String>) -> Self {\n        Self {\n            message: message.into(),\n        }\n    }\n    \n    pub fn greet(&self) {\n        println!(\"{}\", self.message);\n    }\n    \n    pub fn message(&self) -> &str {\n        &self.message\n    }\n}"
+                }
+            },
+            "interface": {
+                "available": true,
+                "required": false,
+                "levels": {
+                    "0": "trait {interfacename} {\n    fn greet(&self);\n}",
+                    "max": "pub trait {interfacename} {\n    fn greet(&self);\n    fn message(&self) -> &str;\n}\n\npub trait {interfacename}Mut: {interfacename} {\n    fn set_message(&mut self, message: &str);\n}"
+                }
+            },
+            "types": {
+                "available": true,
+                "required": true,
+                "description": "Rust always requires types"
+            },
+            "comment": {
+                "available": true,
+                "required": false,
+                "levels": {
+                    "0": "",
+                    "1": "// {description}",
+                    "max": "// ============================================\n// {description}\n// ============================================"
+                }
+            },
+            "doc": {
+                "available": true,
+                "required": false,
+                "levels": {
+                    "0": "",
+                    "1": "//! {description}",
+                    "max": "//! # {description}\n//!\n//! This crate provides a comprehensive demonstration.\n//!\n//! ## Examples\n//!\n//! ```rust\n//! let instance = {classname}::new();\n//! instance.greet();\n//! ```"
+                }
+            },
+            "fun": {
+                "available": true,
+                "required": false,
+                "levels": {
+                    "0": "fn {funname}({typed_args}) {\n    todo!()\n}",
+                    "max": "/// {description}\n///\n/// # Arguments\n/// {arg_docs}\nfn {funname}({typed_args}) -> {return_type} {\n    todo!()\n}"
+                }
+            }
+        }
+    },
+    "java": {
+        "extension": "java",
+        "buildtool": "maven",
+        "templates": {
+            "helloworld": {
+                "base": "public class Main {\n    public static void main(String[] args) {\n        System.out.println(\"Hello, World!\");\n    }\n}"
+            },
+            "fun": {
+                "levels": {
+                    "0": "void greet(String name) {\n    System.out.println(\"Hello, \" + name + \"!\");\n}",
+                    "max": "/**\n * Greet a person by name.\n * @param name The name of the person.\n */\nvoid greet(String name) {\n    System.out.println(\"Hello, \" + name + \"!\");\n}"
+                }
+            }
+        },
+        "options": {
+            "class": {
+                "available": true,
+                "required": true,
+                "levels": {
+                    "0": "public class {classname} {\n    public void greet() {\n        System.out.println(\"Hello, World!\");\n    }\n}",
+                    "1": "public class {classname} {\n    private String message;\n    \n    public {classname}() {\n        this.message = \"Hello, World!\";\n    }\n    \n    public void greet() {\n        System.out.println(this.message);\n    }\n}",
+                    "max": "public class {classname} {\n    private String message;\n    \n    public {classname}() {\n        this(\"Hello, World!\");\n    }\n    \n    public {classname}(String message) {\n        this.message = message;\n    }\n    \n    public String getMessage() {\n        return this.message;\n    }\n    \n    public void setMessage(String message) {\n        this.message = message;\n    }\n    \n    public void greet() {\n        System.out.println(this.message);\n    }\n    \n    public static void main(String[] args) {\n        {classname} instance = new {classname}();\n        instance.greet();\n    }\n}"
+                }
+            },
+            "interface": {
+                "available": true,
+                "required": false,
+                "levels": {
+                    "0": "public interface {interfacename} {\n    void greet();\n}",
+                    "max": "public interface {interfacename} {\n    void greet();\n    String getMessage();\n}\n\npublic interface Mutable{interfacename} extends {interfacename} {\n    void setMessage(String message);\n}"
+                }
+            },
+            "types": {
+                "available": true,
+                "required": true,
+                "description": "Java always requires types"
+            },
+            "comment": {
+                "available": true,
+                "required": false,
+                "levels": {
+                    "0": "",
+                    "1": "// {description}",
+                    "max": "/*\n * ============================================\n * {description}\n * ============================================\n */"
+                }
+            },
+            "doc": {
+                "available": true,
+                "required": false,
+                "levels": {
+                    "0": "",
+                    "1": "/** {description} */",
+                    "max": "/**\n * {description}\n *\n * @author Generated by mkexample\n * @version 1.0.0\n * @since 1.0\n */"
+                }
+            },
+            "fun": {
+                "available": true,
+                "required": false,
+                "levels": {
+                    "0": "{return_type} {funname}({typed_args}) {\n    // TODO\n}",
+                    "max": "/**\n * {description}\n * @param {arg_docs}\n * @return {return_doc}\n */\n{return_type} {funname}({typed_args}) {\n    // TODO\n}"
+                }
+            }
+        }
+    },
+    "cpp": {
+        "extension": "cpp",
+        "buildtool": "cmake",
+        "templates": {
+            "helloworld": {
+                "base": "#include <iostream>\n\nint main() {\n    std::cout << \"Hello, World!\" << std::endl;\n    return 0;\n}"
+            },
+            "fun": {
+                "levels": {
+                    "0": "void greet() {\n}",
+                    "1": "void greet(const std::string& name) {\n    std::cout << \"Hello, \" << name << \"!\" << std::endl;\n}",
+                    "max": "/**\n * @brief Greet a person by name.\n * @param name The name of the person.\n */\nvoid greet(const std::string& name) {\n    std::cout << \"Hello, \" << name << \"!\" << std::endl;\n}"
+                }
+            }
+        },
+        "options": {
+            "class": {
+                "available": true,
+                "required": false,
+                "levels": {
+                    "0": "class {classname}{extends_clause}\n{\npublic:\n    void {methodname}() { }\n};",
+                    "1": "class {classname}{extends_clause}\n{\nprivate:\n    std::string message_;\n\npublic:\n    {classname}() : message_(\"Hello, World!\") { }\n    \n    void {methodname}() {\n        std::cout << message_ << std::endl;\n    }\n};",
+                    "max": "class {classname}{extends_clause}\n{\nprivate:\n    std::string message_;\n\npublic:\n    {classname}() : message_(\"Hello, World!\") { }\n    explicit {classname}(const std::string& message) : message_(message) { }\n    virtual ~{classname}() = default;\n    \n    const std::string& getMessage() const { return message_; }\n    void setMessage(const std::string& message) { message_ = message; }\n    \n    virtual void {methodname}() {\n        std::cout << message_ << std::endl;\n    }\n};"
+                }
+            },
+            "interface": {
+                "available": true,
+                "required": false,
+                "levels": {
+                    "0": "class {interfacename}\n{\npublic:\n    virtual ~{interfacename}() = default;\n    virtual void {methodname}() = 0;\n};",
+                    "max": "class {interfacename}\n{\npublic:\n    virtual ~{interfacename}() = default;\n    virtual void {methodname}() = 0;\n    virtual const std::string& getMessage() const = 0;\n};"
+                }
+            },
+            "types": {
+                "available": true,
+                "required": true,
+                "description": "C++ always requires types"
+            },
+            "comment": {
+                "available": true,
+                "required": false,
+                "levels": {
+                    "0": "",
+                    "1": "// {description}",
+                    "max": "/*\n * {description}\n */"
+                }
+            },
+            "doc": {
+                "available": true,
+                "required": false,
+                "levels": {
+                    "0": "",
+                    "1": "/// @brief {description}",
+                    "max": "/**\n * @file {filename}\n * @brief {description}\n * @author Generated by mkexample\n */"
+                }
+            },
+            "include": {
+                "available": true,
+                "required": false,
+                "levels": {
+                    "0": "",
+                    "1": "#include <iostream>",
+                    "max": "#include <iostream>\n#include <string>\n#include <memory>"
+                }
+            },
+            "fun": {
+                "available": true,
+                "required": false,
+                "levels": {
+                    "0": "void {funname}() {\n}",
+                    "1": "{return_type} {funname}({typed_args}) {\n    // TODO\n}",
+                    "max": "/**\n * @brief {description}\n * @param {arg_docs}\n * @return {return_doc}\n */\n{return_type} {funname}({typed_args}) {\n    // TODO\n}"
+                }
+            }
+        }
+    }
+}
