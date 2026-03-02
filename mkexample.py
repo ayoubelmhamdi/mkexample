@@ -25,16 +25,100 @@ class RequiredOptionError(Exception):
     pass
 
 
+def _read_meta(path: Path) -> dict[str, str]:
+    """Parse a key=value meta.ini file into a dict."""
+    meta: dict[str, str] = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if "=" in line:
+            k, _, v = line.partition("=")
+            meta[k.strip()] = v.strip()
+    return meta
+
+
+def _load_levels(directory: Path) -> dict[str, str]:
+    """Return {level_key: code} for every non-meta file in a directory."""
+    levels: dict[str, str] = {}
+    for p in sorted(directory.iterdir()):
+        if p.is_file() and p.stem != "meta":
+            levels[p.stem] = p.read_text(encoding="utf-8")
+    return levels
+
+
+def _load_template(entry: Path) -> dict[str, Any]:
+    """Load a template entry: file → {base: ...}, directory → {levels: {...}}."""
+    if entry.is_file():
+        return {"base": entry.read_text(encoding="utf-8")}
+    # directory: may contain base.<ext> and level files
+    result: dict[str, Any] = {}
+    levels = _load_levels(entry)
+    if "base" in levels:
+        result["base"] = levels.pop("base")
+    if levels:
+        result["levels"] = levels
+    return result
+
+
+def _load_option(opt_dir: Path) -> dict[str, Any]:
+    """Load one option directory into an option spec dict."""
+    meta_file = opt_dir / "meta.ini"
+    spec: dict[str, Any] = {}
+    if meta_file.exists():
+        raw = _read_meta(meta_file)
+        spec["available"] = raw.get("available", "false").lower() == "true"
+        spec["required"] = raw.get("required", "false").lower() == "true"
+        if "description" in raw:
+            spec["description"] = raw["description"]
+    levels = _load_levels(opt_dir)
+    if levels:
+        spec["levels"] = levels
+    return spec
+
+
 def load_lang_specs(specs_path: Path | None = None) -> dict[str, Any]:
-    """Load language specifications from JSON file."""
+    """Load language specifications from a directory tree."""
     if specs_path is None:
-        specs_path = Path(__file__).parent / "lang_specs.json"
-    
+        specs_path = Path(__file__).parent / "lang_specs"
+
     if not specs_path.exists():
-        raise FileNotFoundError(f"Language specs file not found: {specs_path}")
-    
-    with open(specs_path, "r") as f:
-        return json.load(f)
+        raise FileNotFoundError(f"Language specs directory not found: {specs_path}")
+    if not specs_path.is_dir():
+        raise FileNotFoundError(f"Expected a directory, got a file: {specs_path}")
+
+    specs: dict[str, Any] = {}
+    for lang_dir in sorted(specs_path.iterdir()):
+        if not lang_dir.is_dir():
+            continue
+        lang = lang_dir.name
+
+        # meta.ini
+        meta = _read_meta(lang_dir / "meta.ini") if (lang_dir / "meta.ini").exists() else {}
+        lang_spec: dict[str, Any] = {
+            "extension": meta.get("extension", lang),
+            "buildtool": meta.get("buildtool", "unknown"),
+        }
+
+        # templates/
+        templates_dir = lang_dir / "templates"
+        if templates_dir.is_dir():
+            templates: dict[str, Any] = {}
+            for entry in sorted(templates_dir.iterdir()):
+                name = entry.stem if entry.is_file() else entry.name
+                templates[name] = _load_template(entry)
+            lang_spec["templates"] = templates
+
+        # options/
+        options_dir = lang_dir / "options"
+        if options_dir.is_dir():
+            options: dict[str, Any] = {}
+            for opt_dir in sorted(options_dir.iterdir()):
+                if opt_dir.is_dir():
+                    options[opt_dir.name] = _load_option(opt_dir)
+            lang_spec["options"] = options
+
+        specs[lang] = lang_spec
+
+    return specs
 
 
 def parse_level(level_str: str, available_levels: list[str]) -> str:
@@ -72,44 +156,51 @@ def parse_level(level_str: str, available_levels: list[str]) -> str:
         return available_levels[0]
 
 
-def parse_options(args: list[str]) -> tuple[dict[str, tuple[bool, str]], dict[str, str]]:
+# Level specifiers that are recognized as complexity levels (not param values)
+_LEVEL_KEYS = {"max", "rand", "types"}
+
+
+def parse_items(
+    items: list[str],
+    lang_spec: dict[str, Any],
+) -> tuple[str | None, dict[str, tuple[bool, str]], dict[str, str]]:
     """
-    Parse option arguments like +class, -interface, +classlevel=2, -classname=Foo.
-    
-    Returns:
-        options: dict of option_name -> (enabled, level)
-        params: dict of param_name -> value (e.g., classname -> Foo)
+    Parse positional item arguments into a template name, options, and params.
+
+    Each item is one of:
+      class           → enable 'class' option at level 0
+      class=max       → enable 'class' option at level 'max'
+      comment=1       → enable 'comment' option at level '1'
+      classname=Foo   → named param  (value is not a level specifier)
+      helloworld      → explicit template name
+      buildtool       → passed through as template (special-cased in main)
+
+    Returns (template, options, params).
     """
-    options = {}
-    params = {}
-    
-    for arg in args:
-        if not arg.startswith('+') and not arg.startswith('-'):
-            continue
-        
-        enabled = arg.startswith('+')
-        opt_part = arg[1:]  # Remove +/-
-        
-        # Check for value specification
-        if '=' in opt_part:
-            opt_name, value = opt_part.split('=', 1)
-            
-            # Handle level options like "classlevel" -> "class"
-            if opt_name.endswith('level'):
-                opt_name = opt_name[:-5]  # Remove 'level' suffix
-                options[opt_name] = (enabled, value)
-            # Handle name/value params like "classname", "interfacename"
-            elif opt_name.endswith('name'):
-                param_key = opt_name  # Keep as "classname", "interfacename", etc.
-                params[param_key] = value
+    known_options   = set(lang_spec.get("options",   {}).keys())
+    known_templates = set(lang_spec.get("templates", {}).keys())
+
+    template: str | None = None
+    options:  dict[str, tuple[bool, str]] = {}
+    params:   dict[str, str] = {}
+
+    for item in items:
+        if "=" in item:
+            key, _, val = item.partition("=")
+            # val is a level specifier if it's a digit or a known level keyword
+            if val.isdigit() or val in _LEVEL_KEYS:
+                options[key] = (True, val)
             else:
-                # Generic value param
-                params[opt_name] = value
+                params[key] = val
+        elif item in known_options:
+            options[item] = (True, "0")
+        elif item in known_templates or item == "buildtool":
+            template = item
         else:
-            opt_name = opt_part
-            options[opt_name] = (enabled, "0")  # Default to simplest level
-    
-    return options, params
+            # Unknown item – treat as template name (user may be extending specs)
+            template = item
+
+    return template, options, params
 
 
 def validate_options(lang: str, lang_spec: dict[str, Any], options: dict[str, tuple[bool, str]]) -> None:
@@ -359,149 +450,136 @@ def create_parser() -> argparse.ArgumentParser:
         epilog="""
 Examples:
   %(prog)s python helloworld -o hello.py
-  %(prog)s rust helloworld +class -interface +comment
-  %(prog)s java helloworld +class +classlevel=max +doc
+  %(prog)s cpp class
+  %(prog)s cpp class=max comment
+  %(prog)s java class doc=max classname=MyApp
+  %(prog)s python fun classname=Greeter
   %(prog)s c buildtool
-  %(prog)s python helloworld +classlevel=rand
 
-Options format:
-  +option      Enable option (e.g., +class, +comment)
-  -option      Disable option (e.g., -interface)
-  +optionlevel=N   Set complexity level (0, 1, 2, max, rand)
+Items (positional after lang):
+  class           enable option at minimal level
+  class=max       enable option at specified level (0, 1, max, rand)
+  classname=Foo   named parameter (value is not a level)
+  helloworld      explicit template name
 """,
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    
+
     parser.add_argument(
         "lang",
         nargs="?",
-        help="Programming language (e.g., python, rust, c, java)"
+        help="Programming language (e.g., python, rust, c, java, cpp)"
     )
-    
+
     parser.add_argument(
-        "template",
-        nargs="?",
-        help="Template name (e.g., helloworld) or 'buildtool' to show build tool"
+        "items",
+        nargs="*",
+        help="What to generate: option names, option=level, or named params"
     )
-    
+
     parser.add_argument(
         "-o", "--output",
         help="Output file path. If not specified, prints to stdout."
     )
-    
+
     parser.add_argument(
         "--specs",
         type=Path,
-        help="Path to custom language specs JSON file"
+        help="Path to custom language specs directory (default: lang_specs/)"
     )
-    
+
     parser.add_argument(
         "--list-langs",
         action="store_true",
         help="List available languages and exit"
     )
-    
+
     parser.add_argument(
         "--list-options",
         action="store_true",
         help="List available options for the specified language"
     )
-    
+
     return parser
 
 
 def main() -> int:
     """Main entry point."""
     parser = create_parser()
-    args, extra_args = parser.parse_known_args()
-    
+    args = parser.parse_args()
+
     try:
         # Load language specs
         specs = load_lang_specs(args.specs)
-        
+
         # Handle --list-langs
         if args.list_langs:
             print("Available languages:")
             for lang, spec in specs.items():
-                ext = spec.get("extension", "?")
+                ext  = spec.get("extension", "?")
                 tool = spec.get("buildtool", "?")
                 print(f"  {lang} (.{ext}) - build tool: {tool}")
             return 0
-        
-        # Validate language
+
+        # Require language
+        if not args.lang:
+            parser.print_help()
+            return 0
         lang = args.lang.lower()
         if lang not in specs:
             available = ", ".join(specs.keys())
             print(f"Error: Unknown language '{lang}'. Available: {available}", file=sys.stderr)
             return 1
-        
+
         lang_spec = specs[lang]
-        
+
         # Handle --list-options
         if args.list_options:
             print(f"Available options for '{lang}':")
-            options = lang_spec.get("options", {})
-            for opt_name, opt_spec in options.items():
+            for opt_name, opt_spec in lang_spec.get("options", {}).items():
                 available = opt_spec.get("available", False)
-                required = opt_spec.get("required", False)
-                levels = list(opt_spec.get("levels", {}).keys())
-                
-                status = "✓" if available else "✗"
-                req = " (REQUIRED)" if required else ""
-                lvls = f" [levels: {', '.join(levels)}]" if levels else ""
-                
+                required  = opt_spec.get("required", False)
+                levels    = list(opt_spec.get("levels", {}).keys())
+                status = "\u2713" if available else "\u2717"
+                req    = " (REQUIRED)" if required else ""
+                lvls   = f" [levels: {', '.join(levels)}]" if levels else ""
                 print(f"  {status} {opt_name}{req}{lvls}")
             return 0
-        
-        # Handle buildtool special case
-        if args.template and args.template.lower() == "buildtool":
-            tool = get_buildtool(lang_spec)
-            print(tool)
+
+        # Parse items into template + options + params
+        template, options, params = parse_items(args.items, lang_spec)
+
+        # buildtool shortcut
+        if template == "buildtool":
+            print(get_buildtool(lang_spec))
             return 0
-        
-        # Check if template looks like an option (starts with + or -)
-        # If so, treat it as an option and infer template from options
-        template = args.template
-        all_extra_args = list(extra_args)
-        
-        if template and (template.startswith('+') or template.startswith('-')):
-            # Move template to extra_args
-            all_extra_args.insert(0, template)
-            template = None
-        
-        # Parse and validate options
-        options, params = parse_options(all_extra_args)
+
+        # Validate options
         validate_options(lang, lang_spec, options)
-        
-        # If no template specified, infer from options
+
+        # Infer template if not explicit
         if not template:
-            if "fun" in options and options["fun"][0]:
+            if "fun" in options:
                 template = "fun"
-            elif "class" in options and options["class"][0]:
-                template = "helloworld"  # Default template for class
-            elif "interface" in options and options["interface"][0]:
-                template = "helloworld"  # Default template for interface
             else:
-                template = "helloworld"  # Ultimate default
-        
+                template = "helloworld"
+
         # Generate code
         code = generate_code(lang, template, lang_spec, options, params)
-        
+
         # Output
         if args.output:
             output_path = Path(args.output)
-            # Auto-add extension if not provided
             if not output_path.suffix:
                 ext = lang_spec.get("extension", "txt")
                 output_path = output_path.with_suffix(f".{ext}")
-            
             output_path.write_text(code + "\n")
             print(f"Generated: {output_path}")
         else:
             print(code)
-        
+
         return 0
-        
+
     except OptionNotAvailableError as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1

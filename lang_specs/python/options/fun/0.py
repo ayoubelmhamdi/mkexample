@@ -1,0 +1,2 @@
+def {funname}({args}):
+    pass
