@@ -264,6 +264,17 @@ def apply_placeholders(code: str, params: dict[str, str], defaults: dict[str, st
     return result
 
 
+def _first_nonempty(levels: dict[str, str]) -> str:
+    """Return the first non-empty level value, preferring level '1', then by key order."""
+    # Prefer '1' as the minimal meaningful level
+    if "1" in levels and levels["1"]:
+        return levels["1"]
+    for v in levels.values():
+        if v:
+            return v
+    return ""
+
+
 def select_level(
     levels: dict[str, str],
     requested_level: str,
@@ -271,33 +282,37 @@ def select_level(
 ) -> str:
     """
     Select the appropriate level from available levels.
-    
-    If +types is enabled and a 'types' level exists, prefer it.
-    Otherwise fall back to numeric levels or 'max'.
+
+    When the requested level is the implicit default ("0") and level 0 is
+    empty, fall through to the first non-empty level so that options like
+    `doc` and `comment` work sensibly without requiring `=1` or `=max`.
     """
     available = list(levels.keys())
-    
+
     # If types requested and types level exists, use it
     if has_types and "types" in available:
         return levels["types"]
-    
+
     # Handle special level values
     if requested_level == "rand":
         return levels[random.choice(available)]
-    
+
     if requested_level == "max":
         if "max" in available:
             return levels["max"]
-        # Fall back to highest numeric level
         numeric = [l for l in available if l.isdigit()]
         if numeric:
             return levels[max(numeric, key=int)]
         return levels[available[-1]]
-    
+
     # Try exact match
     if requested_level in available:
-        return levels[requested_level]
-    
+        content = levels[requested_level]
+        # If the user accepted the default "0" and it's empty, pick first non-empty
+        if not content and requested_level == "0":
+            return _first_nonempty(levels)
+        return content
+
     # Try to find closest numeric level
     try:
         requested = int(requested_level)
@@ -309,9 +324,12 @@ def select_level(
             return levels[min(numeric, key=int)]
     except ValueError:
         pass
-    
-    # Default to level 0 or first available
-    return levels.get("0", levels[available[0]])
+
+    # Default to level 0 or first available, skipping empty
+    result = levels.get("0", levels[available[0]])
+    if not result:
+        return _first_nonempty(levels)
+    return result
 
 
 def generate_code(
