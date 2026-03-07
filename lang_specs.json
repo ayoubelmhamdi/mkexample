@@ -284,6 +284,14 @@
                     "max": "class {interfacename}\n{\npublic:\n    virtual ~{interfacename}() = default;\n    virtual void {methodname}() = 0;\n    virtual const std::string& getMessage() const = 0;\n};"
                 }
             },
+            "abstract": {
+                "available": true,
+                "required": false,
+                "levels": {
+                    "0": "class {abstractname}\n{\npublic:\n    virtual ~{abstractname}() = default;\n    virtual void {methodname}() = 0;\n    void concreteMethod() { }\n};",
+                    "max": "class {abstractname}\n{\nprotected:\n    std::string name_;\n\npublic:\n    explicit {abstractname}(const std::string& name) : name_(name) { }\n    virtual ~{abstractname}() = default;\n\n    virtual void {methodname}() = 0;\n    virtual const std::string& getName() const { return name_; }\n    void printInfo() {\n        std::cout << \"Name: \" << name_ << std::endl;\n    }\n};"
+                }
+            },
             "types": {
                 "available": true,
                 "required": true,

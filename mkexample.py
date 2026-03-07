@@ -235,6 +235,7 @@ def apply_placeholders(code: str, params: dict[str, str], defaults: dict[str, st
         defaults = {
             "classname": "HelloWorld",
             "interfacename": "Greeter",
+            "abstractname": "Base",
             "funname": "example",
             "methodname": "greet",
             "args": "",
@@ -398,7 +399,27 @@ def generate_code(
             if levels:
                 content = select_level(levels, level, has_types)
                 parts.append(content)
-    
+            # Auto-set extends so class inherits from the interface
+            if "class" in options and options["class"][0]:
+                iname = params.get("interfacename", "Greeter")
+                if "extends" not in params:
+                    params["extends"] = iname
+
+    # Add abstract if enabled
+    if "abstract" in options and options["abstract"][0]:
+        _, level = options["abstract"]
+        abstract_spec = available_options.get("abstract", {})
+        if abstract_spec.get("available", False):
+            levels = abstract_spec.get("levels", {})
+            if levels:
+                content = select_level(levels, level, has_types)
+                parts.append(content)
+            # Auto-set extends so class inherits from the abstract
+            if "class" in options and options["class"][0]:
+                aname = params.get("abstractname", "Base")
+                if "extends" not in params:
+                    params["extends"] = aname
+
     # Handle +fun option (generate function)
     if "fun" in options and options["fun"][0]:
         _, level = options["fun"]
@@ -428,6 +449,9 @@ def generate_code(
             parts.append(template_spec["base"])
     elif "interface" in options and options["interface"][0]:
         # Interface was already added above, don't add base template
+        pass
+    elif "abstract" in options and options["abstract"][0]:
+        # Abstract was already added above, don't add base template
         pass
     else:
         # No class, fun, or interface specified - use base template or template levels
@@ -501,6 +525,12 @@ Items (positional after lang):
     )
 
     parser.add_argument(
+        "-i", "--interactive",
+        action="store_true",
+        help="Launch the interactive TUI"
+    )
+
+    parser.add_argument(
         "--specs",
         type=Path,
         help="Path to custom language specs directory (default: lang_specs/)"
@@ -539,7 +569,18 @@ def main() -> int:
                 print(f"  {lang} (.{ext}) - build tool: {tool}")
             return 0
 
-        # Require language
+        # Launch TUI if requested or no args
+        import sys
+        if args.interactive or len(sys.argv) == 1:
+            try:
+                from tui import run_tui
+                run_tui(args.specs)
+                return 0
+            except ImportError as e:
+                print(f"Error loading TUI: {e}", file=sys.stderr)
+                return 1
+
+        # Require language for CLI mode
         if not args.lang:
             parser.print_help()
             return 0
